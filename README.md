@@ -20,24 +20,43 @@ SmolLM2-135M is a lightweight Transformer model designed for sequence prediction
     Model architecture is as below:
 
     OptimizedModule(
+    
   (_orig_mod): SmolLM(
+  
     (embedding): Embedding(50257, 512)
+    
     (layers): ModuleList(
+    
       (0-3): 4 x TransformerEncoderLayer(
+      
         (self_attn): MultiheadAttention(
+        
           (out_proj): NonDynamicallyQuantizableLinear(in_features=512, out_features=512, bias=True)
+          
         )
+        
         (linear1): Linear(in_features=512, out_features=2048, bias=True)
+        
         (dropout): Dropout(p=0.1, inplace=False)
+        
         (linear2): Linear(in_features=2048, out_features=512, bias=True)
+        
         (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        
         (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        
         (dropout1): Dropout(p=0.1, inplace=False)
+        
         (dropout2): Dropout(p=0.1, inplace=False)
+        
       )
+      
     )
+    
     (fc_out): Linear(in_features=512, out_features=50257, bias=True)
+    
   )
+  
 )
 
 Model has 64,188,497 trainable parameters.
@@ -51,161 +70,7 @@ In  this repository I have trained SmolLM2-135 model. The following techniques a
 * Training it for 5000 steps while predicting every 500 steps on what it utters. Now fully stop the model and save a checkpoint. Now load this checkpoint and train for 50 more steps
 
   ## Training Logs
-
   
-
-from google.colab import drive
-drive.mount('/content/drive')
-
-Mounted at /content/drive
-
-! cp /content/drive/MyDrive/session_12/shakespeare_drama.txt .
-
-import torch
-import torch.nn as nn
-from torch.optim import AdamW
-from torch.utils.data import DataLoader, Dataset
-from transformers import AutoTokenizer
-from tqdm import tqdm
-import os
-
-# Define the SmolLM2-135M model (a simplified version of a Transformer)
-class SmolLM(nn.Module):
-    def __init__(self, vocab_size, embed_dim, num_heads, num_layers, max_seq_len):
-        super(SmolLM, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embed_dim)
-        self.pos_embedding = nn.Parameter(torch.zeros(1, max_seq_len, embed_dim))
-        self.layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, batch_first=True)
-            for _ in range(num_layers)
-        ])
-        self.fc_out = nn.Linear(embed_dim, vocab_size)
-
-    def forward(self, x):
-        seq_len = x.size(1)
-        x = self.embedding(x) + self.pos_embedding[:, :seq_len, :]
-        for layer in self.layers:
-            x = layer(x)
-        return self.fc_out(x)
-        
-    def parameter_count(self):
-        """Calculates the number of trainable parameters in the model."""
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
-# Shakespeare dataset
-class ShakespeareDataset(Dataset):
-    def __init__(self, tokenizer, text, seq_len):
-        self.tokens = tokenizer(text, return_tensors="pt", truncation=True, padding=True).input_ids[0]
-        self.seq_len = seq_len
-
-    def __len__(self):
-        return len(self.tokens) - self.seq_len
-
-    def __getitem__(self, idx):
-        return (
-            self.tokens[idx:idx + self.seq_len],
-            self.tokens[idx + 1:idx + self.seq_len + 1]
-        )
-
-# Training parameters
-embed_dim = 512
-num_heads = 8
-num_layers = 4
-max_seq_len = 128
-vocab_size = 50257
-batch_size = 16
-initial_steps = 5000
-resume_steps = 50
-eval_interval = 500
-
-# Optimizations
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_float32_matmul_precision("high")
-
-# Load tokenizer and dataset
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
-tokenizer.pad_token = tokenizer.eos_token
-
-text = open("shakespeare_drama.txt").read()  # Load Shakespeare text
-train_dataset = ShakespeareDataset(tokenizer, text, max_seq_len)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-# Initialize model
-model = SmolLM(vocab_size, embed_dim, num_heads, num_layers, max_seq_len).to(device)
-optimizer = AdamW(model.parameters(), lr=1e-4)
-criterion = nn.CrossEntropyLoss()
-model = torch.compile(model)  # Torch.compile for optimization
-
-print(f"Model has {model.parameter_count():,} trainable parameters.")
-
-Model has 64,188,497 trainable parameters.
-
-print(model)
-
-OptimizedModule(
-  (_orig_mod): SmolLM(
-    (embedding): Embedding(50257, 512)
-    (layers): ModuleList(
-      (0-3): 4 x TransformerEncoderLayer(
-        (self_attn): MultiheadAttention(
-          (out_proj): NonDynamicallyQuantizableLinear(in_features=512, out_features=512, bias=True)
-        )
-        (linear1): Linear(in_features=512, out_features=2048, bias=True)
-        (dropout): Dropout(p=0.1, inplace=False)
-        (linear2): Linear(in_features=2048, out_features=512, bias=True)
-        (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
-        (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
-        (dropout1): Dropout(p=0.1, inplace=False)
-        (dropout2): Dropout(p=0.1, inplace=False)
-      )
-    )
-    (fc_out): Linear(in_features=512, out_features=50257, bias=True)
-  )
-)
-
-# Training loop
-def train_model(model, optimizer, criterion, dataloader, steps, eval_interval, checkpoint_path, start_step=1):
-    model.train()
-    progress = tqdm(total=steps, desc="Training", initial=start_step - 1)
-    step = start_step - 1
-    for epoch in range(steps // len(dataloader) + 1):
-        for batch_idx, (x, y) in enumerate(dataloader):
-            if step >= steps:
-                break
-
-            x, y = x.to(device), y.to(device)
-
-            with torch.autocast(device_type="cuda", dtype=torch.float16):  # Autocast
-                outputs = model(x)
-                loss = criterion(outputs.view(-1, vocab_size), y.view(-1))
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            step += 1
-            progress.update(1)
-
-            if step % eval_interval == 0:
-                print(f"Step {step}: Loss = {loss.item():.4f}")
-                eval_model(model, tokenizer, device)
-
-            if step >= steps:
-                break
-
-    # Save checkpoint
-    torch.save(model.state_dict(), checkpoint_path)
-    print(f"Checkpoint saved to {checkpoint_path}")
-
-# Evaluation
-@torch.no_grad()
-def eval_model(model, tokenizer, device, prompt="To be, or not to be"):
-    model.eval()
-    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-    outputs = model(input_ids)
-    predictions = torch.argmax(outputs, dim=-1)
-    decoded = tokenizer.decode(predictions[0], skip_special_tokens=True)
-    print(f"Model utterance: {decoded}")
 
 Training:  10%|█         | 500/5000 [01:08<05:14, 14.30it/s]
 
