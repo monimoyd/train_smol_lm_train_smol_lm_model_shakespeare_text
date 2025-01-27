@@ -16,6 +16,32 @@ SmolLM2-135M is a lightweight Transformer model designed for sequence prediction
     - num_layers: Number of Transformer encoder layers.
     - max_seq_len: Maximum sequence length.
 
+
+    Model architecture is as below:
+
+    OptimizedModule(
+  (_orig_mod): SmolLM(
+    (embedding): Embedding(50257, 512)
+    (layers): ModuleList(
+      (0-3): 4 x TransformerEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=512, out_features=512, bias=True)
+        )
+        (linear1): Linear(in_features=512, out_features=2048, bias=True)
+        (dropout): Dropout(p=0.1, inplace=False)
+        (linear2): Linear(in_features=2048, out_features=512, bias=True)
+        (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+        (dropout1): Dropout(p=0.1, inplace=False)
+        (dropout2): Dropout(p=0.1, inplace=False)
+      )
+    )
+    (fc_out): Linear(in_features=512, out_features=50257, bias=True)
+  )
+)
+
+Model has 64,188,497 trainable parameters.
+
 ## Techniques used during training
 In  this repository I have trained SmolLM2-135 model. The following techniques are used:
 
