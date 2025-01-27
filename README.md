@@ -1,5 +1,22 @@
 # train_smol_lm_train_smol_lm_model_shakespeare_text
 
+## SmolLM2-135M Model
+
+SmolLM2-135M is a lightweight Transformer model designed for sequence prediction tasks. 
+    Key components:
+    - Embedding Layer: Encodes token indices into dense vectors of size `embed_dim`.
+    - Positional Embeddings: Adds position information to token embeddings.
+    - Transformer Encoder Layers: Stacks multiple self-attention layers with residual connections.
+    - Output Layer: Maps the final hidden states to vocabulary logits.
+
+    Parameters:
+    - vocab_size: Size of the vocabulary.
+    - embed_dim: Dimension of token embeddings.
+    - num_heads: Number of attention heads.
+    - num_layers: Number of Transformer encoder layers.
+    - max_seq_len: Maximum sequence length.
+
+## Techniques used during training
 In  this repository I have trained SmolLM2-135 model. The following techniques are used:
 
 * set_float32_matmul_precision
